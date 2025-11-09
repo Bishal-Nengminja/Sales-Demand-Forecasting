@@ -1,0 +1,27 @@
+stages:
+  preprocess:
+    cmd: python src/components/data_preprocessing.py --input data/raw/sales_original.csv --output data/processed/sales_clean.csv
+    deps:
+      - src/components/data_preprocessing.py
+      - data/raw/sales_original.csv
+    outs:
+      - data/processed/sales_clean.csv
+
+  split:
+    cmd: python src/components/make_dataset.py --input data/processed/sales_clean.csv --output data/interim --test_ratio 0.2
+    deps:
+      - src/components/make_dataset.py
+      - data/processed/sales_clean.csv
+    outs:
+      - data/interim/train.csv
+      - data/interim/test.csv
+
+  train:
+    cmd: python src/components/model_trainer.py --train_csv data/interim/train.csv --test_csv data/interim/test.csv --params params.yaml --mlflow_uri ${MLFLOW_TRACKING_URI}
+    deps:
+      - src/components/model_trainer.py
+      - data/interim/train.csv
+      - data/interim/test.csv
+      - params.yaml
+    outs:
+      - models/prophet_model.pkl
