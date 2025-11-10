@@ -9,7 +9,7 @@ import yaml
 from dotenv import load_dotenv
 from src.utils.logger import get_logger
 
-# ✅ Initialize logger
+# Initialize logger
 logger = get_logger(__name__)
 
 def load_config(params_path):
@@ -35,10 +35,10 @@ def train(train_csv, test_csv, params_path, mlflow_uri=None):
         mlflow.set_experiment(cfg.get('experiment_name', 'sales_forecast_prophet_experiment'))
         logger.info(f"Using MLflow tracking URI: {tracking_uri}")
 
-        # ✅ Check connection (try to start a dummy run)
+        # Check connection (try to start a dummy run)
         with mlflow.start_run(run_name="connection_test"):
             mlflow.log_param("connection_check", "ok")
-        logger.info("✅ Connected to MLflow successfully.")
+        logger.info("Connected to MLflow successfully.")
     except Exception as e:
         logger.warning(f"⚠️ Could not connect to remote MLflow ({e}). Falling back to local tracking.")
         mlflow.set_tracking_uri("file:./mlflow_tracking")
@@ -51,8 +51,17 @@ def train(train_csv, test_csv, params_path, mlflow_uri=None):
     logger.info("Testing data loaded: %s rows", len(test_df))
 
     # Prophet expects columns named 'ds' and 'y'
-    train_df = train_df.rename(columns={'date': 'ds', 'sales': 'y'})
-    test_df = test_df.rename(columns={'date': 'ds', 'sales': 'y'})
+    train_df = train_df.rename(columns={'order_date': 'ds', 'line_total': 'y'})
+    test_df = test_df.rename(columns={'order_date': 'ds', 'line_total': 'y'})
+
+    # Clean up numeric column (remove commas, convert to float)
+    train_df['y'] = train_df['y'].replace({',': ''}, regex=True).astype(float)
+    test_df['y'] = test_df['y'].replace({',': ''}, regex=True).astype(float)
+
+    # Convert ds column to datetime
+    train_df['ds'] = pd.to_datetime(train_df['ds'])
+    test_df['ds'] = pd.to_datetime(test_df['ds'])
+
 
     # Train Prophet model
     m = Prophet(
@@ -65,7 +74,7 @@ def train(train_csv, test_csv, params_path, mlflow_uri=None):
 
     with mlflow.start_run(run_name="prophet_training"):
         m.fit(train_df)
-        logger.info("✅ Prophet model training completed.")
+        logger.info("Prophet model training completed.")
 
         # Forecast on test data
         forecast = m.predict(test_df[['ds']])
@@ -90,7 +99,7 @@ def train(train_csv, test_csv, params_path, mlflow_uri=None):
         mlflow.log_artifact(model_path)
         logger.info(f"Model saved to {model_path}")
 
-    logger.info("🎯 Training and MLflow logging complete.")
+    logger.info("Training and MLflow logging complete.")
 
 
 if __name__ == "__main__":
